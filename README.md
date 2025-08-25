@@ -65,3 +65,13 @@ Check Homebridge logs for error messages.
 - **Refresh Switch**: Triggers refresh mode
 - **Timer Display**: Shows remaining timer (displayed as battery level)
 
+## Parameter IDs:
+The plugin uses the following Systemair SAVEConnect parameter IDs:
+- **1130**: Fan speed control (0=off, 2=low, 3=medium, 4=high)
+- **1110**: Timer remaining time
+- **1120**: Current temperature sensor reading
+- **2000**: Target temperature setting
+- **1125**: Current humidity sensor reading
+
+**Important**: These parameter IDs are based on common Systemair configurations but may vary by device model. If temperature or humidity readings are not working correctly, you may need to modify the parameter IDs in the code to match your specific device's API configuration.
+
