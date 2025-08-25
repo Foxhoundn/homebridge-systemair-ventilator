@@ -31,6 +31,12 @@ class SystemairVentilator {
     // Timer service (using BatteryService instead of LightSensor)
     this.timerService = new Service.BatteryService(this.config.name + " Timer");
 
+    // Thermostat service
+    this.thermostatService = new Service.Thermostat(this.config.name + " Thermostat");
+
+    // Humidity sensor service
+    this.humiditySensorService = new Service.HumiditySensor(this.config.name + " Humidity");
+
     this.setupCharacteristics();
   }
 
@@ -55,6 +61,30 @@ class SystemairVentilator {
     this.timerService
       .getCharacteristic(Characteristic.BatteryLevel)
       .onGet(this.getTimer.bind(this));
+
+    // Thermostat characteristics
+    this.thermostatService
+      .getCharacteristic(Characteristic.CurrentTemperature)
+      .onGet(this.getCurrentTemperature.bind(this));
+
+    this.thermostatService
+      .getCharacteristic(Characteristic.TargetTemperature)
+      .onGet(this.getTargetTemperature.bind(this))
+      .onSet(this.setTargetTemperature.bind(this));
+
+    this.thermostatService
+      .getCharacteristic(Characteristic.CurrentHeatingCoolingState)
+      .onGet(this.getCurrentHeatingCoolingState.bind(this));
+
+    this.thermostatService
+      .getCharacteristic(Characteristic.TargetHeatingCoolingState)
+      .onGet(this.getTargetHeatingCoolingState.bind(this))
+      .onSet(this.setTargetHeatingCoolingState.bind(this));
+
+    // Humidity sensor characteristic
+    this.humiditySensorService
+      .getCharacteristic(Characteristic.CurrentRelativeHumidity)
+      .onGet(this.getCurrentRelativeHumidity.bind(this));
   }
 
   async retryRequest(url, retries = 3) {
@@ -152,7 +182,112 @@ class SystemairVentilator {
     }
   }
 
+  // Thermostat methods
+  async getCurrentTemperature() {
+    const url = `http://${this.config.ip}/mread?{"1120":1}`;
+    this.log(`getCurrentTemperature: Fetching from ${url}`);
+    try {
+      const response = await this.retryRequest(url);
+      const temperature = response.data["1120"] || 20; // Default to 20°C if no data
+      this.log(`getCurrentTemperature: Current temperature is ${temperature}°C`);
+      return temperature;
+    } catch (error) {
+      this.log(`getCurrentTemperature: Error - ${error.message}`);
+      return 20; // Default to 20°C if an error occurs
+    }
+  }
+
+  async getTargetTemperature() {
+    const url = `http://${this.config.ip}/mread?{"2000":1}`;
+    this.log(`getTargetTemperature: Fetching from ${url}`);
+    try {
+      const response = await this.retryRequest(url);
+      const temperature = response.data["2000"] || 20; // Default to 20°C if no data
+      this.log(`getTargetTemperature: Target temperature is ${temperature}°C`);
+      return temperature;
+    } catch (error) {
+      this.log(`getTargetTemperature: Error - ${error.message}`);
+      return 20; // Default to 20°C if an error occurs
+    }
+  }
+
+  async setTargetTemperature(value) {
+    const url = `http://${this.config.ip}/mwrite?{"2000":${value}}`;
+    this.log(`setTargetTemperature: Setting target temperature to ${value}°C`);
+    try {
+      await this.retryRequest(url);
+      this.log(`setTargetTemperature: Successfully set to ${value}°C`);
+    } catch (error) {
+      this.log(`setTargetTemperature: Error - ${error.message}`);
+    }
+  }
+
+  async getCurrentHeatingCoolingState() {
+    // For simplicity, we'll determine state based on fan activity
+    // 0 = OFF, 1 = HEAT, 2 = COOL, 3 = AUTO
+    const url = `http://${this.config.ip}/mread?{"1130":1}`;
+    this.log(`getCurrentHeatingCoolingState: Fetching from ${url}`);
+    try {
+      const response = await this.retryRequest(url);
+      const fanSpeed = response.data["1130"] || 0;
+      const state = fanSpeed > 0 ? 3 : 0; // AUTO if fan is running, OFF otherwise
+      this.log(`getCurrentHeatingCoolingState: Current state is ${state} (fan speed: ${fanSpeed})`);
+      return state;
+    } catch (error) {
+      this.log(`getCurrentHeatingCoolingState: Error - ${error.message}`);
+      return 0; // Default to OFF
+    }
+  }
+
+  async getTargetHeatingCoolingState() {
+    // Return AUTO as the target state when active
+    const url = `http://${this.config.ip}/mread?{"1130":1}`;
+    this.log(`getTargetHeatingCoolingState: Fetching from ${url}`);
+    try {
+      const response = await this.retryRequest(url);
+      const fanSpeed = response.data["1130"] || 0;
+      const state = fanSpeed > 0 ? 3 : 0; // AUTO if fan is running, OFF otherwise
+      this.log(`getTargetHeatingCoolingState: Target state is ${state}`);
+      return state;
+    } catch (error) {
+      this.log(`getTargetHeatingCoolingState: Error - ${error.message}`);
+      return 0; // Default to OFF
+    }
+  }
+
+  async setTargetHeatingCoolingState(value) {
+    // 0 = OFF, 1 = HEAT, 2 = COOL, 3 = AUTO
+    this.log(`setTargetHeatingCoolingState: Setting target state to ${value}`);
+    try {
+      if (value === 0) {
+        // Turn off the fan
+        await this.setActive(0);
+      } else {
+        // Turn on the fan (any heating/cooling/auto mode)
+        await this.setActive(1);
+      }
+      this.log(`setTargetHeatingCoolingState: Successfully set to ${value}`);
+    } catch (error) {
+      this.log(`setTargetHeatingCoolingState: Error - ${error.message}`);
+    }
+  }
+
+  // Humidity sensor method
+  async getCurrentRelativeHumidity() {
+    const url = `http://${this.config.ip}/mread?{"1125":1}`;
+    this.log(`getCurrentRelativeHumidity: Fetching from ${url}`);
+    try {
+      const response = await this.retryRequest(url);
+      const humidity = response.data["1125"] || 50; // Default to 50% if no data
+      this.log(`getCurrentRelativeHumidity: Current humidity is ${humidity}%`);
+      return humidity;
+    } catch (error) {
+      this.log(`getCurrentRelativeHumidity: Error - ${error.message}`);
+      return 50; // Default to 50% if an error occurs
+    }
+  }
+
   getServices() {
-    return [this.fanService, this.refreshService, this.timerService];
+    return [this.fanService, this.refreshService, this.timerService, this.thermostatService, this.humiditySensorService];
   }
 }
