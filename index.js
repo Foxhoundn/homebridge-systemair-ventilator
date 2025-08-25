@@ -6,8 +6,8 @@ module.exports = (homebridge) => {
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
   homebridge.registerAccessory(
-    'homebridge-systemair-ventilator',
-    'SystemairVentilator',
+    'homebridge-systemair-enhanced',
+    'SystemairVentilatorEnhanced',
     SystemairVentilator
   );
 };
@@ -21,11 +21,11 @@ class SystemairVentilator {
     // Parameter IDs for Systemair SAVEConnect API
     // These may need adjustment based on your specific device model
     this.PARAM_IDS = {
-      FAN_SPEED: "1130",           // Fan speed control (0=off, 2=low, 3=medium, 4=high)
-      TIMER: "1110",               // Timer remaining time
-      CURRENT_TEMP: "1120",        // Current temperature sensor reading
-      TARGET_TEMP: "2000",         // Target temperature setting  
-      HUMIDITY: "1125"             // Current humidity sensor reading
+      FAN_SPEED: '1130', // Fan speed control (0=off, 2=low, 3=medium, 4=high)
+      TIMER: '1110', // Timer remaining time
+      CURRENT_TEMP: '12543', // Current temperature sensor reading
+      TARGET_TEMP: '2000', // Target temperature setting
+      HUMIDITY: '12135', // Current humidity sensor reading
     };
 
     this.axiosInstance = axios.create({
@@ -33,19 +33,23 @@ class SystemairVentilator {
     });
 
     // Fan service
-    this.fanService = new Service.Fanv2(this.config.name + " Fan");
+    this.fanService = new Service.Fanv2(this.config.name + ' Fan');
 
     // Refresh service
-    this.refreshService = new Service.Switch(this.config.name + " Refresh");
+    this.refreshService = new Service.Switch(this.config.name + ' Refresh');
 
     // Timer service (using BatteryService instead of LightSensor)
-    this.timerService = new Service.BatteryService(this.config.name + " Timer");
+    this.timerService = new Service.BatteryService(this.config.name + ' Timer');
 
     // Thermostat service
-    this.thermostatService = new Service.Thermostat(this.config.name + " Thermostat");
+    this.thermostatService = new Service.Thermostat(
+      this.config.name + ' Thermostat'
+    );
 
     // Humidity sensor service
-    this.humiditySensorService = new Service.HumiditySensor(this.config.name + " Humidity");
+    this.humiditySensorService = new Service.HumiditySensor(
+      this.config.name + ' Humidity'
+    );
 
     this.setupCharacteristics();
   }
@@ -84,19 +88,7 @@ class SystemairVentilator {
       .setProps({
         minValue: 10,
         maxValue: 38,
-        minStep: 0.5
-      });
-
-    this.thermostatService
-      .getCharacteristic(Characteristic.CurrentHeatingCoolingState)
-      .onGet(this.getCurrentHeatingCoolingState.bind(this));
-
-    this.thermostatService
-      .getCharacteristic(Characteristic.TargetHeatingCoolingState)
-      .onGet(this.getTargetHeatingCoolingState.bind(this))
-      .onSet(this.setTargetHeatingCoolingState.bind(this))
-      .setProps({
-        validValues: [0, 3] // Only OFF and AUTO modes supported
+        minStep: 0.5,
       });
 
     // Humidity sensor characteristic
@@ -114,14 +106,18 @@ class SystemairVentilator {
           this.log(`Retry failed: ${error.message}`);
           throw error;
         }
-        this.log(`Retrying request (${i + 1}/${retries}) due to: ${error.message}`);
+        this.log(
+          `Retrying request (${i + 1}/${retries}) due to: ${error.message}`
+        );
         await new Promise((resolve) => setTimeout(resolve, 1000)); // 1s delay before retry
       }
     }
   }
 
   async setActive(value) {
-    const url = `http://${this.config.ip}/mwrite?{"${this.PARAM_IDS.FAN_SPEED}":${value ? '1' : '0'}}`;
+    const url = `http://${this.config.ip}/mwrite?{"${
+      this.PARAM_IDS.FAN_SPEED
+    }":${value ? '1' : '0'}}`;
     this.log(`SetActive: Sending request to ${url}`);
     await this.retryRequest(url);
     this.log(`SetActive: Successfully set to ${value ? 'ON' : 'OFF'}`);
@@ -160,7 +156,9 @@ class SystemairVentilator {
     const response = await this.retryRequest(url);
     const speed = response.data[this.PARAM_IDS.FAN_SPEED];
     let percentage = speed === 2 ? 16 : speed === 3 ? 50 : speed === 4 ? 83 : 0;
-    this.log(`GetRotationSpeed: Current speed is ${speed} (value: ${percentage}%)`);
+    this.log(
+      `GetRotationSpeed: Current speed is ${speed} (value: ${percentage}%)`
+    );
     return percentage;
   }
 
@@ -207,11 +205,13 @@ class SystemairVentilator {
     try {
       const response = await this.retryRequest(url);
       let temperature = response.data[this.PARAM_IDS.CURRENT_TEMP] || 20; // Default to 20°C if no data
-      
+
       // Ensure temperature is within HomeKit range (-270 to 100°C)
       temperature = Math.max(-270, Math.min(100, temperature));
-      
-      this.log(`getCurrentTemperature: Current temperature is ${temperature}°C`);
+
+      this.log(
+        `getCurrentTemperature: Current temperature is ${temperature}°C`
+      );
       return temperature;
     } catch (error) {
       this.log(`getCurrentTemperature: Error - ${error.message}`);
@@ -225,10 +225,10 @@ class SystemairVentilator {
     try {
       const response = await this.retryRequest(url);
       let temperature = response.data[this.PARAM_IDS.TARGET_TEMP] || 20; // Default to 20°C if no data
-      
+
       // Ensure temperature is within HomeKit target range (10-38°C)
       temperature = Math.max(10, Math.min(38, temperature));
-      
+
       this.log(`getTargetTemperature: Target temperature is ${temperature}°C`);
       return temperature;
     } catch (error) {
@@ -240,7 +240,7 @@ class SystemairVentilator {
   async setTargetTemperature(value) {
     // Ensure the value is within valid range
     value = Math.max(10, Math.min(38, value));
-    
+
     const url = `http://${this.config.ip}/mwrite?{"${this.PARAM_IDS.TARGET_TEMP}":${value}}`;
     this.log(`setTargetTemperature: Setting target temperature to ${value}°C`);
     try {
@@ -251,56 +251,6 @@ class SystemairVentilator {
     }
   }
 
-  async getCurrentHeatingCoolingState() {
-    // For simplicity, we'll determine state based on fan activity
-    // 0 = OFF, 1 = HEAT, 2 = COOL, 3 = AUTO
-    const url = `http://${this.config.ip}/mread?{"${this.PARAM_IDS.FAN_SPEED}":1}`;
-    this.log(`getCurrentHeatingCoolingState: Fetching from ${url}`);
-    try {
-      const response = await this.retryRequest(url);
-      const fanSpeed = response.data[this.PARAM_IDS.FAN_SPEED] || 0;
-      const state = fanSpeed > 0 ? 3 : 0; // AUTO if fan is running, OFF otherwise
-      this.log(`getCurrentHeatingCoolingState: Current state is ${state} (fan speed: ${fanSpeed})`);
-      return state;
-    } catch (error) {
-      this.log(`getCurrentHeatingCoolingState: Error - ${error.message}`);
-      return 0; // Default to OFF
-    }
-  }
-
-  async getTargetHeatingCoolingState() {
-    // Return AUTO as the target state when active
-    const url = `http://${this.config.ip}/mread?{"${this.PARAM_IDS.FAN_SPEED}":1}`;
-    this.log(`getTargetHeatingCoolingState: Fetching from ${url}`);
-    try {
-      const response = await this.retryRequest(url);
-      const fanSpeed = response.data[this.PARAM_IDS.FAN_SPEED] || 0;
-      const state = fanSpeed > 0 ? 3 : 0; // AUTO if fan is running, OFF otherwise
-      this.log(`getTargetHeatingCoolingState: Target state is ${state}`);
-      return state;
-    } catch (error) {
-      this.log(`getTargetHeatingCoolingState: Error - ${error.message}`);
-      return 0; // Default to OFF
-    }
-  }
-
-  async setTargetHeatingCoolingState(value) {
-    // 0 = OFF, 1 = HEAT, 2 = COOL, 3 = AUTO
-    this.log(`setTargetHeatingCoolingState: Setting target state to ${value}`);
-    try {
-      if (value === 0) {
-        // Turn off the fan
-        await this.setActive(0);
-      } else {
-        // Turn on the fan (any heating/cooling/auto mode)
-        await this.setActive(1);
-      }
-      this.log(`setTargetHeatingCoolingState: Successfully set to ${value}`);
-    } catch (error) {
-      this.log(`setTargetHeatingCoolingState: Error - ${error.message}`);
-    }
-  }
-
   // Humidity sensor method
   async getCurrentRelativeHumidity() {
     const url = `http://${this.config.ip}/mread?{"${this.PARAM_IDS.HUMIDITY}":1}`;
@@ -308,10 +258,10 @@ class SystemairVentilator {
     try {
       const response = await this.retryRequest(url);
       let humidity = response.data[this.PARAM_IDS.HUMIDITY] || 50; // Default to 50% if no data
-      
+
       // Ensure humidity is within valid range (0-100%)
       humidity = Math.max(0, Math.min(100, humidity));
-      
+
       this.log(`getCurrentRelativeHumidity: Current humidity is ${humidity}%`);
       return humidity;
     } catch (error) {
@@ -321,6 +271,12 @@ class SystemairVentilator {
   }
 
   getServices() {
-    return [this.fanService, this.refreshService, this.timerService, this.thermostatService, this.humiditySensorService];
+    return [
+      this.fanService,
+      this.refreshService,
+      this.timerService,
+      this.thermostatService,
+      this.humiditySensorService,
+    ];
   }
 }
