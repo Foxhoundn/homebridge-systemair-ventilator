@@ -267,16 +267,25 @@ class SystemairVentilator {
 
   async getCurrentHeatingCoolingState() {
     // Always return Auto
-    return 3;
+    const targetTemperature = await this.getTargetTemperature();
+    const currentTemperature = await this.getCurrentTemperature();
+
+    if (!targetTemperature) {
+      return 0; // Off
+    }
+
+    if (currentTemperature < targetTemperature) {
+      return 1; // Heating
+    } else {
+      return 2; // Cooling
+    }
   }
 
   async getTargetHeatingCoolingState() {
-    // Always return Auto
-    return 3;
+    return this.getCurrentHeatingCoolingState();
   }
 
   async setTargetHeatingCoolingState(value) {
-    // Always set to Auto
     if (value === 0) {
       await this.setActive(0); // Turn off the fan
     } else {
