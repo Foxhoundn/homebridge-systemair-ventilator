@@ -6,7 +6,7 @@ module.exports = (homebridge) => {
   Service = homebridge.hap.Service;
   Characteristic = homebridge.hap.Characteristic;
   homebridge.registerAccessory(
-    'homebridge-systemair-enhanced',
+    '@lv426/homebridge-systemair-enhanced',
     'SystemairVentilatorEnhanced',
     SystemairVentilator
   );

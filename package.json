@@ -1,7 +1,7 @@
 {
-  "name": "homebridge-systemair-enhanced",
+  "name": "@lv426/homebridge-systemair-enhanced",
   "version": "1.0.0",
-  "description": "An enhanced Homebridge plugin for controlling Systemair Ventilators.",
+  "description": "An enhanced Homebridge plugin for controlling SystemAir Ventilators, which includes Temperature controls and Humidity readings",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -26,6 +26,9 @@
   },
   "dependencies": {
     "axios": "^1.4.0"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "homebridge": {
     "pluginAlias": "SystemairVentilatorEnhanced",
