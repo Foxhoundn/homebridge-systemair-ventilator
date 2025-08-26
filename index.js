@@ -88,8 +88,20 @@ class SystemairVentilator {
       .setProps({
         minValue: 10,
         maxValue: 38,
-        minStep: 0.5,
+        minStep: 1,
       });
+
+    this.thermostatService
+      .getCharacteristic(Characteristic.TargetHeatingCoolingState)
+      .onGet(this.getTargetHeatingCoolingState.bind(this))
+      .onSet(this.setTargetHeatingCoolingState.bind(this))
+      .setProps({
+        validValues: [0, 3], // Only OFF and AUTO modes supported
+      });
+
+    this.thermostatService
+      .getCharacteristic(Characteristic.CurrentHeatingCoolingState)
+      .onGet(this.getCurrentHeatingCoolingState.bind(this));
 
     // Humidity sensor characteristic
     this.humiditySensorService
@@ -204,10 +216,10 @@ class SystemairVentilator {
     this.log(`getCurrentTemperature: Fetching from ${url}`);
     try {
       const response = await this.retryRequest(url);
-      let temperature = response.data[this.PARAM_IDS.CURRENT_TEMP] || 20; // Default to 20°C if no data
+      let temperature = response.data[this.PARAM_IDS.CURRENT_TEMP] / 10 || 20; // Default to 20°C if no data
 
-      // Ensure temperature is within HomeKit range (-270 to 100°C)
-      temperature = Math.max(-270, Math.min(100, temperature));
+      // Ensure temperature is within HomeKit range (10 to 38°C)
+      temperature = Math.max(10, Math.min(38, temperature));
 
       this.log(
         `getCurrentTemperature: Current temperature is ${temperature}°C`
@@ -224,7 +236,7 @@ class SystemairVentilator {
     this.log(`getTargetTemperature: Fetching from ${url}`);
     try {
       const response = await this.retryRequest(url);
-      let temperature = response.data[this.PARAM_IDS.TARGET_TEMP] || 20; // Default to 20°C if no data
+      let temperature = response.data[this.PARAM_IDS.TARGET_TEMP] / 10 || 20; // Default to 20°C if no data
 
       // Ensure temperature is within HomeKit target range (10-38°C)
       temperature = Math.max(10, Math.min(38, temperature));
@@ -241,13 +253,34 @@ class SystemairVentilator {
     // Ensure the value is within valid range
     value = Math.max(10, Math.min(38, value));
 
-    const url = `http://${this.config.ip}/mwrite?{"${this.PARAM_IDS.TARGET_TEMP}":${value}}`;
+    const url = `http://${this.config.ip}/mwrite?{"${
+      this.PARAM_IDS.TARGET_TEMP
+    }":${value * 10}}`;
     this.log(`setTargetTemperature: Setting target temperature to ${value}°C`);
     try {
       await this.retryRequest(url);
       this.log(`setTargetTemperature: Successfully set to ${value}°C`);
     } catch (error) {
       this.log(`setTargetTemperature: Error - ${error.message}`);
+    }
+  }
+
+  async getCurrentHeatingCoolingState() {
+    // Always return Auto
+    return 3;
+  }
+
+  async getTargetHeatingCoolingState() {
+    // Always return Auto
+    return 3;
+  }
+
+  async setTargetHeatingCoolingState(value) {
+    // Always set to Auto
+    if (value === 0) {
+      await this.setActive(0); // Turn off the fan
+    } else {
+      await this.setActive(1); // Turn on the fan
     }
   }
 
