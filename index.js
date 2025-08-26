@@ -22,7 +22,6 @@ class SystemairVentilator {
     // These may need adjustment based on your specific device model
     this.PARAM_IDS = {
       FAN_SPEED: '1130', // Fan speed control (0=off, 2=low, 3=medium, 4=high)
-      TIMER: '1110', // Timer remaining time
       CURRENT_TEMP: '12543', // Current temperature sensor reading
       TARGET_TEMP: '2000', // Target temperature setting
       HUMIDITY: '12135', // Current humidity sensor reading
@@ -37,9 +36,6 @@ class SystemairVentilator {
 
     // Refresh service
     this.refreshService = new Service.Switch(this.config.name + ' Refresh');
-
-    // Timer service (using BatteryService instead of LightSensor)
-    this.timerService = new Service.BatteryService(this.config.name + ' Timer');
 
     // Thermostat service
     this.thermostatService = new Service.Thermostat(
@@ -70,11 +66,6 @@ class SystemairVentilator {
     this.refreshService
       .getCharacteristic(Characteristic.On)
       .onSet(this.setRefresh.bind(this));
-
-    // Timer characteristic (using Battery Level to store remaining time)
-    this.timerService
-      .getCharacteristic(Characteristic.BatteryLevel)
-      .onGet(this.getTimer.bind(this));
 
     // Thermostat characteristics
     this.thermostatService
@@ -188,28 +179,6 @@ class SystemairVentilator {
     }
   }
 
-  async getTimer() {
-    const url = `http://${this.config.ip}/mread?{"${this.PARAM_IDS.TIMER}":2}`;
-    this.log(`Timer: Fetching timer value from ${url}`);
-    try {
-      const response = await this.retryRequest(url);
-      let timerValue = response.data[this.PARAM_IDS.TIMER]; // Extract timer value
-
-      // Ensure timer value is valid for HomeKit (0 - 100% battery level range)
-      if (timerValue < 0) {
-        timerValue = 0;
-      } else if (timerValue > 100) {
-        timerValue = 100; // Max HomeKit battery level
-      }
-
-      this.log(`Timer: Current remaining time is ${timerValue} minutes.`);
-      return timerValue; // Return valid percentage
-    } catch (error) {
-      this.log(`Timer: Error - ${error.message}`);
-      return 0; // Default to 0% if an error occurs
-    }
-  }
-
   // Thermostat methods
   async getCurrentTemperature() {
     const url = `http://${this.config.ip}/mread?{"${this.PARAM_IDS.CURRENT_TEMP}":1}`;
@@ -316,7 +285,6 @@ class SystemairVentilator {
     return [
       this.fanService,
       this.refreshService,
-      this.timerService,
       this.thermostatService,
       this.humiditySensorService,
     ];
